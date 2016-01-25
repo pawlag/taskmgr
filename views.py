@@ -3,12 +3,12 @@ from functools import wraps
 from flask import Flask, flash, redirect, render_template, request, session, url_for, g
 from forms import AddTaskForm
 from flask.ext.sqlalchemy import SQLAlchemy
-from models import Task
 
 # config
 app = Flask(__name__)
 app.config.from_object('flask_config')
 db = SQLAlchemy(app)
+from models import Task
 
 # helper functions
 def login_required(test):

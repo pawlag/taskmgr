@@ -1,5 +1,4 @@
 # project/models.py
-
 from views import db
 
 class Task(db.Model):
