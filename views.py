@@ -1,14 +1,15 @@
 # project/views.py
 from functools import wraps
 from flask import Flask, flash, redirect, render_template, request, session, url_for, g
-from forms import AddTaskForm
+from forms import AddTaskForm, RegisterForm, LoginForm
 from flask.ext.sqlalchemy import SQLAlchemy
+from datetime import datetime
 
 # config
 app = Flask(__name__)
 app.config.from_object('flask_config')
 db = SQLAlchemy(app)
-from models import Task
+from models import Task, User
 
 # helper functions
 def login_required(test):
@@ -25,26 +26,33 @@ def login_required(test):
 @app.route('/logout/')
 def logout():
 	session.pop('logged_in', None)
+	session.pop('user_id', None)
 	flash('Goodbye!')
 	return redirect(url_for('login'))
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
+	error=None
+	form=LoginForm(request.form)
 	if request.method == 'POST':
-		if request.form['username'] != app.config['USERNAME'] or request.form['password'] != app.config['PASSWORD']:
-			error = 'Invalid Credentials. Please try again.'
-			return render_template('login.html', error=error)
+		if form.validate_on_submit():
+			user=User.query.filter_by(name=request.form['name']).first()
+			if user is not None and request.form['password'] == user.password:
+				session['logged_in'] = True
+				session['user_id'] = user.id
+				flash('Welcome!')
+				return redirect(url_for('tasks'))
+			else:
+				error = 'Invalid username or password.'
 		else:
-			session['logged_in'] = True
-			flash('Welcome!')
-			return redirect(url_for('tasks'))
-	return render_template('login.html')
+			error = 'Both fields are required!'
+	return render_template('login.html', form=form, error=error)
 	
 @app.route('/tasks/')
 @login_required
 def tasks():
-	open_tasks = db.session.query(Task).filter_by(status='1').order_by(Task.due_date.asc())
-	closed_tasks = db.session.query(Task).filter_by(status='0').order_by(Task.due_date.asc())
+	open_tasks = db.session.query(Task).filter_by(status='1',user_id=session['user_id']).order_by(Task.due_date.asc())
+	closed_tasks = db.session.query(Task).filter_by(status='0',user_id=session['user_id']).order_by(Task.due_date.asc())
 	return render_template('tasks.html',form=AddTaskForm(request.form),open_tasks=open_tasks,closed_tasks=closed_tasks)
 
 # Add new tasks
@@ -54,7 +62,7 @@ def new_task():
 	form = AddTaskForm(request.form)
 	if request.method == 'POST':
 		if form.validate_on_submit():
-			new_task = Task(form.name.data, form.due_date.data, form.priority.data,'1')
+			new_task = Task(form.name.data, form.due_date.data, form.priority.data, datetime.utcnow(),1,session['user_id'])
 			db.session.add(new_task)
 			db.session.commit()
 			flash('New entry was successfully posted. Thanks.')
@@ -80,3 +88,21 @@ def delete_entry(task_id):
 	db.session.commit()
 	flash('The task was deleted.')
 	return redirect(url_for('tasks'))
+
+# User Register
+@app.route('/register/', methods=['GET', 'POST'])
+def register():
+	error = None
+	form = RegisterForm(request.form)
+	print (form.name.data,form.email.data,form.password.data)
+	if request.method == 'POST':
+		if form.validate_on_submit():
+			print ("validated")
+			new_user = User(form.name.data,form.email.data,form.password.data)
+			db.session.add(new_user)
+			db.session.commit()
+			flash('Thanks for registering. Please login.')
+			return redirect(url_for('login'))
+		else:
+			flash('Incorrect data, please correct')
+	return render_template('register.html', form=form, error=error)
