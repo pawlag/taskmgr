@@ -66,8 +66,10 @@ def new_task():
 			db.session.add(new_task)
 			db.session.commit()
 			flash('New entry was successfully posted. Thanks.')
-	return redirect(url_for('tasks'))
-
+			return redirect(url_for('tasks'))
+		else:
+			return render_template('tasks.html', form=form, error=error)
+	return render_template('tasks.html', form=form, error=error)
 	
 # Mark tasks as complete
 @app.route('/complete/<int:task_id>/')
@@ -106,3 +108,8 @@ def register():
 		else:
 			flash('Incorrect data, please correct')
 	return render_template('register.html', form=form, error=error)
+	
+def flash_errors(form):
+	for field, errors in form.errors.items():
+		for error in errors:
+			flash(u"Error in the %s field - %s" % (getattr(form, field).label.text, error), 'error')
